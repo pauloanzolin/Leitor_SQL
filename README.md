@@ -34,3 +34,23 @@ You can check out [the Next.js GitHub repository](https://github.com/vercel/next
 The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
 
 Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+
+## 📝 Descrição
+Este PR adiciona a propriedade `container_name` ao serviço `web` no arquivo `docker-compose.yml`. A mudança fixa o nome do contêiner como `leitor_sql`, padronizando o ciclo de vida do contêiner e facilitando a execução de comandos de inspeção (como `docker logs` e `docker exec`).
+
+## 🛠️ Tipo de Alteração
+- [ ] Bug fix (correção que não quebra funcionalidades existentes)
+- [ ] Nova feature (adição de nova funcionalidade)
+- [x] Refatoração / Ajuste de Infraestrutura (alteração de configuração sem mudança de código)
+
+## 🔍 O que foi feito?
+- Adicionado `container_name: leitor_sql` ao serviço `web`.
+
+## 🧪 Como testar?
+1. Baixe esta branch: `git checkout develop` (ou a branch específica do PR).
+2. Suba o ambiente: `docker compose up -d`.
+3. Verifique se o contêiner subiu com o nome exato rodando: `docker ps`.
+4. O contêiner deve aparecer na lista como `leitor_sql` em vez do padrão gerado automaticamente pelo Docker Compose (`diretorio-web-1`).
+
+## ⚠️ Impactos e Riscos
+- **Escalonamento:** Esta mudança impede o uso do comando `--scale web=X`, pois o nome do contêiner passará a ser único no host. Sem impactos esperados para a arquitetura atual do projeto.
