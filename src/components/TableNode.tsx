@@ -1,3 +1,4 @@
+import React, { memo } from 'react';
 import { Handle, Position } from '@xyflow/react';
 import { Key } from 'lucide-react';
 import clsx from 'clsx';
@@ -6,14 +7,18 @@ export interface TableNodeData {
   name: string;
   columns: { name: string; type: string }[];
   primaryKeys: string[];
+  isFocused?: boolean;
 }
 
-export default function TableNode({ data, selected }: { data: TableNodeData; selected: boolean }) {
-  const { name, columns = [], primaryKeys = [] } = data;
+function TableNode({ data, selected }: { data: TableNodeData; selected: boolean }) {
+  const { name, columns = [], primaryKeys = [], isFocused = false } = data;
 
-  // Limit display to 15 columns for visual performance
-  const displayCols = columns.slice(0, 15);
-  const hasMore = columns.length > 15;
+  // Mostrar colunas apenas se a tabela estiver em foco ou selecionada
+  // Isso reduz o número de elementos DOM de ~75.000 para ~5.000, deixando o app super leve!
+  const showColumns = selected || isFocused;
+  
+  const displayCols = showColumns ? columns.slice(0, 15) : [];
+  const hasMore = showColumns && columns.length > 15;
 
   return (
     <div
@@ -65,3 +70,5 @@ export default function TableNode({ data, selected }: { data: TableNodeData; sel
     </div>
   );
 }
+
+export default memo(TableNode);
