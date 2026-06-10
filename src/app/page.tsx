@@ -59,6 +59,58 @@ function getConcentricLayout(nodes: any[], edges: any[]) {
   return sorted;
 }
 
+function getHierarchicalLayout(rootNodeId: string, allNodes: any[], allEdges: any[]) {
+  const visited = new Set<string>();
+  const queue = [{ id: rootNodeId, depth: 0 }];
+  const nodeLevels = new Map<string, number>();
+  
+  while (queue.length > 0) {
+    const current = queue.shift()!;
+    if (visited.has(current.id)) continue;
+    
+    visited.add(current.id);
+    nodeLevels.set(current.id, current.depth);
+    
+    // Find neighbors (only outgoing or incoming, we want all connections)
+    const neighbors = new Set<string>();
+    allEdges.forEach(e => {
+      if (e.source === current.id && !visited.has(e.target)) neighbors.add(e.target);
+      if (e.target === current.id && !visited.has(e.source)) neighbors.add(e.source);
+    });
+    
+    neighbors.forEach(nId => {
+      queue.push({ id: nId, depth: current.depth + 1 });
+    });
+  }
+
+  // Group nodes by depth
+  const nodesByDepth: Record<number, any[]> = {};
+  allNodes.forEach(node => {
+    if (!visited.has(node.id)) return;
+    const d = nodeLevels.get(node.id)!;
+    if (!nodesByDepth[d]) nodesByDepth[d] = [];
+    nodesByDepth[d].push(node);
+  });
+  
+  return allNodes.map(node => {
+    if (!visited.has(node.id)) {
+      return { ...node, hidden: true };
+    }
+    
+    const depth = nodeLevels.get(node.id)!;
+    const levelNodes = nodesByDepth[depth];
+    const indexInLevel = levelNodes.indexOf(node);
+    
+    const totalHeight = levelNodes.length * 350;
+    const startY = -(totalHeight / 2) + 175;
+    
+    const x = depth * 600; // Espaçamento horizontal entre colunas
+    const y = startY + indexInLevel * 350;
+    
+    return { ...node, hidden: false, position: { x, y }, style: { ...node.style, opacity: 1 } };
+  });
+}
+
 export default function App() {
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
@@ -78,6 +130,7 @@ export default function App() {
   const [selectedTable, setSelectedTable] = useState<string | null>(null);
 
   const [allOriginalEdges, setAllOriginalEdges] = useState<Edge[]>([]);
+  const [allOriginalNodes, setAllOriginalNodes] = useState<any[]>([]);
 
   // Carregar do Banco
   const handleConnect = async (e: React.FormEvent) => {
@@ -116,12 +169,13 @@ export default function App() {
           data: fk // store original fk info
         }));
 
-        // Layout
+        // Layout inicial Concêntrico
         newNodes = getConcentricLayout(newNodes, newEdges);
         
         setNodes(newNodes);
         setEdges(newEdges);
         setAllOriginalEdges(newEdges);
+        setAllOriginalNodes(newNodes);
       } else {
         setErrorMsg(data.message);
       }
@@ -136,35 +190,26 @@ export default function App() {
   const handleNodeClick = useCallback((event: any, node: any) => {
     setSelectedTable(node.id);
     
-    // Find connected nodes
-    const connectedNodeIds = new Set<string>();
-    connectedNodeIds.add(node.id);
-    
-    allOriginalEdges.forEach(e => {
-      if (e.source === node.id) connectedNodeIds.add(e.target);
-      if (e.target === node.id) connectedNodeIds.add(e.source);
+    // Aplicar o Layout Hierárquico a partir da tabela clicada
+    setNodes(() => {
+      return getHierarchicalLayout(node.id, allOriginalNodes, allOriginalEdges);
     });
     
-    setNodes(nds => nds.map(n => {
-      if (connectedNodeIds.has(n.id)) {
-        return { ...n, style: { ...n.style, opacity: 1 } };
-      }
-      return { ...n, style: { ...n.style, opacity: 0.15 } };
-    }));
-    
+    // Ocultar as arestas de nós que não estão visíveis
     setEdges(eds => eds.map(e => {
+      // Destacar arestas ligadas diretamente ao nó raiz
       if (e.source === node.id || e.target === node.id) {
-        return { ...e, style: { stroke: '#3b82f6', strokeWidth: 3, opacity: 1 }, markerEnd: { type: MarkerType.ArrowClosed, color: '#3b82f6' }, animated: true };
+        return { ...e, hidden: false, style: { stroke: '#3b82f6', strokeWidth: 3, opacity: 1 }, markerEnd: { type: MarkerType.ArrowClosed, color: '#3b82f6' }, animated: true };
       }
-      return { ...e, style: { stroke: '#334155', strokeWidth: 1, opacity: 0.1 }, markerEnd: { type: MarkerType.ArrowClosed, color: '#334155' }, animated: false };
+      return { ...e, hidden: false, style: { stroke: '#334155', strokeWidth: 1, opacity: 0.1 }, markerEnd: { type: MarkerType.ArrowClosed, color: '#334155' }, animated: false };
     }));
-  }, [allOriginalEdges, setNodes, setEdges]);
+  }, [allOriginalEdges, allOriginalNodes, setNodes, setEdges]);
 
   const handlePaneClick = useCallback(() => {
     setSelectedTable(null);
-    setNodes(nds => nds.map(n => ({ ...n, style: { ...n.style, opacity: 1 } })));
+    setNodes(allOriginalNodes.map(n => ({ ...n, hidden: false, style: { ...n.style, opacity: 1 } })));
     setEdges(allOriginalEdges);
-  }, [allOriginalEdges, setNodes, setEdges]);
+  }, [allOriginalEdges, allOriginalNodes, setNodes, setEdges]);
 
   // Search Logic
   const handleSearch = (term: string) => {
@@ -257,11 +302,23 @@ export default function App() {
           onNodeClick={handleNodeClick}
           onPaneClick={handlePaneClick}
           fitView
-          className="bg-slate-950"
+          minZoom={0.01}
+          maxZoom={2}
+          className="bg-slate-950 dark-theme-flow"
         >
           <Background color="#1e293b" gap={24} />
-          <Controls className="bg-slate-900 border-slate-800 fill-blue-400" />
-          <MiniMap nodeColor="#1e293b" maskColor="rgba(15, 23, 42, 0.8)" className="bg-slate-950 border border-slate-800" />
+          
+          <Controls 
+            className="bg-slate-900 border-slate-800 fill-slate-300"
+            style={{ display: 'flex', flexDirection: 'column', backgroundColor: '#0f172a', border: '1px solid #1e293b', borderRadius: '8px', overflow: 'hidden' }}
+          />
+          
+          <MiniMap 
+            nodeColor="#3b82f6" 
+            maskColor="rgba(15, 23, 42, 0.7)" 
+            className="bg-slate-900 border border-slate-800 rounded-lg shadow-xl"
+            style={{ backgroundColor: '#0f172a' }}
+          />
         </ReactFlow>
       </main>
 
