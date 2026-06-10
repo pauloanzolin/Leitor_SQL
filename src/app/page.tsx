@@ -107,7 +107,7 @@ function getHierarchicalLayout(rootNodeId: string, allNodes: any[], allEdges: an
     const x = depth * 600; // Espaçamento horizontal entre colunas
     const y = startY + indexInLevel * 350;
     
-    return { ...node, hidden: false, position: { x, y }, style: { ...node.style, opacity: 1 } };
+    return { ...node, hidden: false, position: { x, y }, style: { ...node.style, opacity: 1 }, data: { ...node.data, isFocused: true } };
   });
 }
 
@@ -153,7 +153,8 @@ export default function App() {
           data: {
             name: t.name,
             columns: data.columns[t.name] || [],
-            primaryKeys: data.primary_keys[t.name] || []
+            primaryKeys: data.primary_keys[t.name] || [],
+            isFocused: false
           },
           position: { x: 0, y: 0 }
         }));
@@ -207,7 +208,7 @@ export default function App() {
 
   const handlePaneClick = useCallback(() => {
     setSelectedTable(null);
-    setNodes(allOriginalNodes.map(n => ({ ...n, hidden: false, style: { ...n.style, opacity: 1 } })));
+    setNodes(allOriginalNodes.map(n => ({ ...n, hidden: false, style: { ...n.style, opacity: 1 }, data: { ...n.data, isFocused: false } })));
     setEdges(allOriginalEdges);
   }, [allOriginalEdges, allOriginalNodes, setNodes, setEdges]);
 
